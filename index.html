@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Avatar</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+        .mobile-container { width: 100%; max-width: 420px; height: 100vh; background: white; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,0.1); border-radius: 20px; overflow: hidden; }
+        .progress-bar { width: 100%; height: 4px; background: #e0e0e0; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #ff6b6b, #ff8c42); transition: width 0.5s ease; }
+        .screen-wrapper { display: flex; flex-direction: column; height: 100%; }
+        .screen-content { flex: 1; display: flex; flex-direction: column; position: relative; overflow-y: auto; }
+        .back-button { position: absolute; top: 16px; left: 16px; width: 40px; height: 40px; border: none; background: transparent; font-size: 24px; cursor: pointer; color: #333; }
+        .back-button:disabled { opacity: 0.3; }
+        .screen-body { flex: 1; padding: 60px 20px 80px; display: flex; flex-direction: column; justify-content: center; }
+        .screen-title { font-size: 24px; font-weight: 700; color: #1a1a1a; margin-bottom: 8px; text-align: center; }
+        .screen-subtitle { font-size: 14px; color: #666; text-align: center; margin-bottom: 24px; }
+        .options-container { display: flex; flex-direction: column; gap: 12px; }
+        .option-button { display: flex; align-items: center; gap: 16px; padding: 16px 20px; border: 2px solid #e0e0e0; border-radius: 12px; background: white; cursor: pointer; font-size: 16px; }
+        .option-button:hover { border-color: #ff6b6b; background: #fff8f7; }
+        .option-button.selected { border-color: #ff6b6b; background: linear-gradient(135deg, rgba(255,107,107,0.1), rgba(255,140,66,0.1)); }
+        .option-emoji { font-size: 28px; min-width: 32px; }
+        .option-label { flex: 1; color: #1a1a1a; font-weight: 500; }
+        .helper-text { text-align: center; font-size: 13px; color: #999; margin-top: 12px; }
+        .screen-footer { padding: 20px; background: white; border-top: 1px solid #f0f0f0; }
+        .next-button { width: 100%; padding: 14px 24px; background: linear-gradient(135deg, #ff6b6b, #ff8c42); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
+        .next-button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .loading-container { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; }
+        .circular-progress { position: relative; width: 200px; height: 200px; margin-bottom: 32px; display: flex; align-items: center; justify-content: center; }
+        .progress-text { position: absolute; font-size: 36px; font-weight: 700; color: #ff6b6b; }
+        .loading-message { font-size: 18px; font-weight: 600; color: #1a1a1a; text-align: center; margin-bottom: 32px; }
+        .steps-container { width: 100%; max-width: 300px; }
+        .step { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #e0e0e0; }
+        .step:last-child { border-bottom: none; }
+        .step-indicator { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #e0e0e0; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #999; font-weight: 600; }
+        .step.completed .step-indicator { background: linear-gradient(135deg, #ff6b6b, #ff8c42); border-color: #ff6b6b; color: white; }
+        .step-text { font-size: 14px; color: #666; }
+        .step.completed .step-text { color: #1a1a1a; font-weight: 500; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script>
+        const { useState, useEffect } = React;
+
+        function BaseScreen({ children, onNext, onBack, currentScreen, totalScreens, canProceed = true, hideProgress = false }) {
+            const percentage = ((currentScreen + 1) / totalScreens) * 100;
+            return (
+                <div className="screen-wrapper">
+                    {!hideProgress && (
+                        <div style={{ padding: '16px 20px' }}>
+                            <div className="progress-bar">
+                                <div className="progress-fill" style={{ width: percentage + '%' }}></div>
+                            </div>
+                        </div>
+                    )}
+                    <div className="screen-content">
+                        <button className="back-button" onClick={onBack} disabled={currentScreen === 0}>←</button>
+                        <div className="screen-body">{children}</div>
+                        <div className="screen-footer">
+                            <button className="next-button" onClick={onNext} disabled={!canProceed}>Далі</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function Screen1({ onNext, onBack, selections, onSelection, currentScreen, totalScreens }) {
+            const options = [
+                { id: 1, emoji: '👨‍💼', label: 'Експертів для розвитку бізнесу' },
+                { id: 2, emoji: '💰', label: 'Інвестора' },
+                { id: 3, emoji: '👥', label: 'Нетворкінг' },
+                { id: 4, emoji: '👨‍💼', label: 'Команду у свій бізнес' }
+            ];
+            const selected = selections.screen1 || [];
+            return (
+                <BaseScreen onNext={onNext} onBack={onBack} currentScreen={currentScreen} totalScreens={totalScreens} canProceed={selected.length > 0}>
+                    <div className="screen-title">Що ти шукаєш?</div>
+                    <div className="options-container">
+                        {options.map(option => (
+                            <button key={option.id} className={`option-button ${selected.includes(option.id) ? 'selected' : ''}`} onClick={() => onSelection('screen1', option.id, true)}>
+                                <div className="option-emoji">{option.emoji}</div>
+                                <div className="option-label">{option.label}</div>
+                            </button>
+                        ))}
+                    </div>
+                    <div className="helper-text">Можна обрати два варіанти</div>
+                </BaseScreen>
+            );
+        }
+
+        function Screen2({ onNext, onBack, selections, onSelection, currentScreen, totalScreens }) {
+            const options = [
+                { id: 1, emoji: '👨‍💼', label: 'Клієнтів для консалтингу' },
+                { id: 2, emoji: '💰', label: 'Проекти для інвестування' },
+                { id: 3, emoji: '👥', label: 'Нетворкінг' },
+                { id: 4, emoji: '👨‍💼', label: 'Роботу' }
+            ];
+            const selected = selections.screen2 || [];
+            return (
+                <BaseScreen onNext={onNext} onBack={onBack} currentScreen={currentScreen} totalScreens={totalScreens} canProceed={selected.length > 0}>
+                    <div className="screen-title">Що ти шукаєш?</div>
+                    <div className="options-container">
+                        {options.map(option => (
+                            <button key={option.id} className={`option-button ${selected.includes(option.id) ? 'selected' : ''}`} onClick={() => onSelection('screen2', option.id, true)}>
+                                <div className="option-emoji">{option.emoji}</div>
+                                <div className="option-label">{option.label}</div>
+                            </button>
+                        ))}
+                    </div>
+                    <div className="helper-text">Можна обрати два варіанти</div>
+                </BaseScreen>
+            );
+        }
+
+        function Screen3({ onNext, onBack, selections, onSelection, currentScreen, totalScreens }) {
+            const options = [
+                { id: 1, emoji: '📦', label: 'Реклама, контент, маркетинг' },
+                { id: 2, emoji: '👨‍💼', label: 'Продажі' },
+                { id: 3, emoji: '📱', label: 'Цифровий інфлюенсер' },
+                { id: 4, emoji: '🎓', label: 'ШІ та машинне навчання' },
+                { id: 5, emoji: '🚗', label: 'Автомобільні технології' },
+                { id: 6, emoji: '🧺', label: 'Спожичані товари' },
+                { id: 7, emoji: '📊', label: 'Дані та аналітика' }
+            ];
+            const selected = selections.screen3;
+            return (
+                <BaseScreen onNext={onNext} onBack={onBack} currentScreen={currentScreen} totalScreens={totalScreens} canProceed={selected !== null}>
+                    <div className="screen-title">В якій сфері ти працюєш?</div>
+                    <div className="options-container">
+                        {options.map(option => (
+                            <button key={option.id} className={`option-button ${selected === option.id ? 'selected' : ''}`} onClick={() => onSelection('screen3', option.id, false)}>
+                                <div className="option-emoji">{option.emoji}</div>
+                                <div className="option-label">{option.label}</div>
+                            </button>
+                        ))}
+                    </div>
+                </BaseScreen>
+            );
+        }
+
+        function Screen4({ onNext, onBack, selections, onSelection, currentScreen, totalScreens }) {
+            const options = [
+                { id: 1, emoji: '💰', label: 'Більше лідів' },
+                { id: 2, emoji: '🎯', label: 'Чітке позиціонування' },
+                { id: 3, emoji: '👨‍💼', label: 'Сильний бренд' },
+                { id: 4, emoji: '🎪', label: 'Масштабування процесів' },
+                { id: 5, emoji: '📊', label: 'Збільшення конверсії' }
+            ];
+            const selected = selections.screen4 || [];
+            return (
+                <BaseScreen onNext={onNext} onBack={onBack} currentScreen={currentScreen} totalScreens={totalScreens} canProceed={selected.length > 0}>
+                    <div className="screen-title">Як ви допомагаєте клієнтам</div>
+                    <div className="screen-subtitle">Який результат ви зазвичай даєте?</div>
+                    <div className="options-container">
+                        {options.map(option => (
+                            <button key={option.id} className={`option-button ${selected.includes(option.id) ? 'selected' : ''}`} onClick={() => onSelection('screen4', option.id, true)}>
+                                <div className="option-emoji">{option.emoji}</div>
+                                <div className="option-label">{option.label}</div>
+                            </button>
+                        ))}
+                    </div>
+                    <div className="helper-text">Можна обрати два варіанти</div>
+                </BaseScreen>
+            );
+        }
+
+        function Screen5({ onNext, onBack, currentScreen, totalScreens }) {
+            const [progress, setProgress] = useState(0);
+            const [completedSteps, setCompletedSteps] = useState([true, false, false]);
+
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    setProgress(prev => prev >= 100 ? 100 : prev + Math.random() * 30);
+                }, 500);
+
+                setTimeout(() => setCompletedSteps([true, true, false]), 2000);
+                setTimeout(() => {
+                    setCompletedSteps([true, true, true]);
+                    setProgress(100);
+                }, 4000);
+
+                return () => clearInterval(interval);
+            }, []);
+
+            return (
+                <BaseScreen onNext={onNext} onBack={onBack} currentScreen={currentScreen} totalScreens={totalScreens} canProceed={progress === 100} hideProgress={true}>
+                    <div className="loading-container">
+                        <div className="circular-progress">
+                            <svg width="200" height="200" viewBox="0 0 200 200">
+                                <circle cx="100" cy="100" r="90" fill="none" stroke="#e0e0e0" strokeWidth="8" />
+                                <circle cx="100" cy="100" r="90" fill="none" stroke="url(#gradient)" strokeWidth="8" strokeDasharray={`${Math.min(progress, 100) * 5.655} 565.5`} strokeLinecap="round" style={{ transform: 'rotate(-90deg)', transformOrigin: '100px 100px', transition: 'stroke-dasharray 0.3s ease' }} />
+                                <defs>
+                                    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stopColor="#ff6b6b" />
+                                        <stop offset="100%" stopColor="#ff8c42" />
+                                    </linearGradient>
+                                </defs>
+                            </svg>
+                            <div className="progress-text">{Math.round(Math.min(progress, 100))}%</div>
+                        </div>
+                        <div className="loading-message">Формую для тебе бізнес потребу...</div>
+                        <div className="steps-container">
+                            <div className={`step ${completedSteps[0] ? 'completed' : ''}`}>
+                                <div className="step-indicator">{completedSteps[0] ? '✓' : ''}</div>
+                                <div className="step-text">Аналізую твої відповіді</div>
+                            </div>
+                            <div className={`step ${completedSteps[1] ? 'completed' : ''}`}>
+                                <div className="step-indicator">{completedSteps[1] ? '✓' : ''}</div>
+                                <div className="step-text">Підбір профілів</div>
+                            </div>
+                            <div className={`step ${completedSteps[2] ? 'completed' : ''}`}>
+                                <div className="step-indicator">{completedSteps[2] ? '✓' : ''}</div>
+                                <div className="step-text">Формую твій план росту</div>
+                            </div>
+                        </div>
+                    </div>
+                </BaseScreen>
+            );
+        }
+
+        function App() {
+            const [currentScreen, setCurrentScreen] = useState(0);
+            const [selections, setSelections] = useState({ screen1: [], screen2: [], screen3: null, screen4: [] });
+
+            const screens = [Screen1, Screen2, Screen3, Screen4, Screen5];
+            const CurrentScreen = screens[currentScreen];
+
+            const handleSelection = (screenKey, value, isMultiple = false) => {
+                setSelections(prev => {
+                    if (isMultiple) {
+                        const current = prev[screenKey] || [];
+                        const updated = current.includes(value) ? current.filter(item => item !== value) : [...current, value];
+                        return { ...prev, [screenKey]: updated };
+                    }
+                    return { ...prev, [screenKey]: value };
+                });
+            };
+
+            return (
+                <div className="mobile-container">
+                    <CurrentScreen
+                        onNext={() => currentScreen < screens.length - 1 && setCurrentScreen(currentScreen + 1)}
+                        onBack={() => currentScreen > 0 && setCurrentScreen(currentScreen - 1)}
+                        selections={selections}
+                        onSelection={handleSelection}
+                        currentScreen={currentScreen}
+                        totalScreens={screens.length}
+                    />
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
